@@ -1,11 +1,15 @@
 import { deleteOrderFirebase } from './orders-firebase';
 import { addToCart } from './cart';
 import { addCatalogQty } from './catalog-qty';
+import { dayEnd, dayStart, dayBefore, monthEnd, monthStart, monthBefore } from './../utils/date-time';
 
 export const setQtyPagesOrders = () => {
   return (dispatch, getState) => {
       const keysLength = Object.keys(getState().orders.headers).length;
-      const qtyPages = keysLength % 3 === 0 ? keysLength / 3  : Math.floor(keysLength / 3) + 1;
+      const ordersListHeight = getState().orders.listHeight;
+      const rowsPerPage = ordersListHeight > 0 ? Math.floor(ordersListHeight / 42) : 10;
+      const qtyPages = keysLength % rowsPerPage === 0 ? keysLength / rowsPerPage : Math.floor(keysLength / rowsPerPage) + 1;
+      // const qtyPages = keysLength % 3 === 0 ? keysLength / 3  : Math.floor(keysLength / 3) + 1;
       dispatch({
         type: 'SET_QTY_PAGES_ORDERS',
         qtyPages: qtyPages || 1
@@ -92,6 +96,60 @@ export const restoreOrder = id => {
 
 // filters
 
+export const filterOrders = () => {
+  return (dispatch, getState) => {
+    const ordersState = getState().orders;
+    const { filters, headers } = ordersState;
+    let result;
+    if (filters.status === 'Все' && filters.text === '' && filters.dateRange === 'Все') {
+      result = headers;
+    } else {
+      let filterByStatus = false;
+      let filterByDate = false;
+      if (filters.status !== 'Все') {
+        filterByStatus = true;
+      }
+      let dateStart, dateEnd;
+      if (filters.dateRange !== 'Все') {
+        filterByDate = true;
+        let today = new Date();
+        if (filters.dateRange === 'Сегодня') {
+          dateStart = dayStart(today);
+          dateEnd = dayEnd(today);
+        } else if (filters.dateRange === 'Вчера') {
+          dateStart = dayBefore(today);
+          dateEnd = dayEnd(dayBefore(today));
+        } else if (filters.dateRange === 'ЭтотМесяц') {
+          dateStart = monthStart(today);
+          dateEnd = monthEnd(today);
+        } else if (filters.dateRange === 'ПрошлыйМесяц') {
+          dateStart = monthStart(monthBefore(today));
+          dateEnd = monthEnd(monthBefore(today));
+        } else if (filters.dateRange === 'БолееРанние') {
+          dateStart = new Date(1970, 1, 1);
+          dateEnd = monthStart(monthBefore(today));
+        }
+      }
+      result = Object.keys(headers).reduce((res, key) => {
+        let filterMatch = true;
+        if (filterByStatus) {
+          filterMatch = headers[key].status === filters.status ? filterMatch : false;
+        }
+        if (filterByDate) {
+          const orderDate = new Date(headers[key].date);
+          filterMatch = orderDate >= dateStart && orderDate <= dateEnd ? filterMatch : false;
+        }
+        return filterMatch ? { ...res, [key]: headers[key] } : res;
+      }, {})
+
+    }
+    dispatch({
+      type: 'RECEIVE_ORDERS_HEADERS_FILTERED',
+      payload: result
+    })
+  }
+}
+
 export const setOrdersListHeight = () => {
   return dispatch => {
     const height = document.getElementById('orderListContainer').getBoundingClientRect().height;
@@ -99,69 +157,22 @@ export const setOrdersListHeight = () => {
       type: 'SET_ORDERS_LIST_HEIGHT',
       payload: height
     });
+    dispatch(setQtyPagesOrders());
+    dispatch(detectIsLastPage());
   }
 }
 
-export const toggleFiltersExpandedOrders = () => {
-  return (dispatch, getState) => {
-    const currentState = getState().orders.filtersExpanded;
-    dispatch({
-      type: 'SET_FILTERS_EXPANDED',
-      payload: !currentState
-    });
-    dispatch(setOrdersListHeight());
-  }
-}
-
-export const setFiltersStatusOrders = status => {
+export const setFiltersOrders = (status, dateRange, text) => {
   return dispatch => {
     dispatch({
       type: 'SET_ORDER_FILTER',
-      payload: { status}
+      payload: { status, dateRange, text}
     });
+    dispatch(filterOrders());
   }
 }
 
-export const setFiltersDateOrders = dateRange => {
-  return dispatch => {
-    // const dateStart = new Date();
-    // const dateEnd = new Date();
-    dispatch({
-      type: 'SET_ORDER_FILTER',
-      // payload: { dateRange, dateStart, dateEnd }
-      payload: { dateRange }
-    });
-  }
-}
-
-export const setFiltersNumberOrders = number => {
-  return dispatch => {
-    dispatch({
-      type: 'SET_ORDER_FILTER',
-      payload: { number}
-    });
-  }
-}
-
-export const setFiltersCommentOrders = comment => {
-  return dispatch => {
-    dispatch({
-      type: 'SET_ORDER_FILTER',
-      payload: { comment}
-    });
-  }
-}
-
-export const setFiltersAmountOrders = amount => {
-  return dispatch => {
-    dispatch({
-      type: 'SET_ORDER_FILTER',
-      payload: { amount}
-    });
-  }
-}
-
-export const resetOrdersFilters = () => {
+export const resetFiltersOrders = () => {
   return dispatch => {
     dispatch({
       type: 'SET_ORDER_FILTER',
@@ -173,5 +184,16 @@ export const resetOrdersFilters = () => {
                 text: ''
                }
     });
+    dispatch(filterOrders());
+  }
+}
+
+export const setListCollapsedAll = () => {
+  return (dispatch, getState) => {
+    const listCollapsedAll = getState().orders.listCollapsedAll;
+    dispatch({
+      type: 'SET_LIST_COLLAPSED_ALL_ORDERS',
+      payload: !listCollapsedAll
+    })
   }
 }

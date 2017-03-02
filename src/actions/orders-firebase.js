@@ -1,13 +1,18 @@
 import { database } from '../firebase/firebase-app';
 
-import { setQtyPagesOrders } from './orders';
+import { setQtyPagesOrders, filterOrders } from './orders';
 
 const receiveHeaders = (dispatch, data) => {
   return new Promise(resolve => {
+    // filter deleted orders
+    const dataNoDeleted = Object.keys(data).reduce((res, key) => {
+      return data[key].deleted ? res : { ...res, [key]: data[key]}
+    }, {});
     dispatch({
       type: 'RECEIVE_ORDERS_HEADERS',
-      payload: data
+      payload: dataNoDeleted
     });
+    dispatch(filterOrders());
     resolve();
   });
 };
