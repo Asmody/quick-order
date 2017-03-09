@@ -2,59 +2,9 @@ import { deleteOrderFirebase } from './orders-firebase';
 import { addToCart } from './cart';
 import { addCatalogQty } from './catalog-qty';
 import { dayEnd, dayStart, dayBefore, monthEnd, monthStart, monthBefore } from './../utils/date-time';
-
-export const setQtyPagesOrders = () => {
-  return (dispatch, getState) => {
-      const keysLength = Object.keys(getState().orders.headers).length;
-      const ordersListHeight = getState().orders.listHeight;
-      const rowsPerPage = ordersListHeight > 0 ? Math.floor(ordersListHeight / 42) : 10;
-      const qtyPages = keysLength % rowsPerPage === 0 ? keysLength / rowsPerPage : Math.floor(keysLength / rowsPerPage) + 1;
-      // const qtyPages = keysLength % 3 === 0 ? keysLength / 3  : Math.floor(keysLength / 3) + 1;
-      dispatch({
-        type: 'SET_QTY_PAGES_ORDERS',
-        qtyPages: qtyPages || 1
-      });
-  };
-};
-
-export const detectIsLastPage = () => {
-  return (dispatch, getState) => {
-      const { qtyPages, pageNumber } = getState().orders;
-      const payload = qtyPages === pageNumber;
-      dispatch({
-        type: 'SET_IS_LAST_PAGE_ORDERS',
-        payload: payload
-      });
-  };
-};
-
-export const moveOrdersForward = () => {
-  return (dispatch, getState) => {
-    dispatch({
-      type: 'INCREASE_PAGE_NUMBER_ORDERS'
-    });
-    dispatch(detectIsLastPage());
-  };
-};
-
-export const moveOrdersBack = () => {
-  return (dispatch, getState) => {
-    dispatch({
-      type: 'DECREASE_PAGE_NUMBER_ORDERS'
-    });
-    dispatch(detectIsLastPage());
-  };
-};
-
-export const goToOrdersPage = (pageNumber) => {
-  return (dispatch, getState) => {
-    dispatch({
-      type: 'SET_PAGE_NUMBER_ORDERS',
-      pageNumber: pageNumber
-    });
-    dispatch(detectIsLastPage());
-  };
-};
+import { setQtyPagesOrders, detectIsLastPage } from './orders-navigation'
+export { setQtyPagesOrders, detectIsLastPage, moveOrdersForward, moveOrdersBack, goToOrdersPage } from './orders-navigation';
+// export
 
 export const deleteOrder = id => {
   return (dispatch, getState) => {
@@ -106,6 +56,7 @@ export const filterOrders = () => {
     } else {
       let filterByStatus = false;
       let filterByDate = false;
+      let filterByText = false;
       if (filters.status !== 'Все') {
         filterByStatus = true;
       }
@@ -130,17 +81,29 @@ export const filterOrders = () => {
           dateEnd = monthStart(monthBefore(today));
         }
       }
+      if (filters.text) {
+        filterByText = true;
+      }
+      // filter by status and date
       result = Object.keys(headers).reduce((res, key) => {
         let filterMatch = true;
+        // filter by status
         if (filterByStatus) {
           filterMatch = headers[key].status === filters.status ? filterMatch : false;
         }
+        // filter by date
         if (filterByDate) {
           const orderDate = new Date(headers[key].date);
           filterMatch = orderDate >= dateStart && orderDate <= dateEnd ? filterMatch : false;
         }
+        // filter by text (nr, comment, ref)
+        if (filterByText) {
+          filterMatch = headers[key].nr.includes(filters.text) || headers[key].comment.includes(filters.text) || headers[key].ref.includes(filters.text);
+        }
+
         return filterMatch ? { ...res, [key]: headers[key] } : res;
-      }, {})
+      }, {});
+
 
     }
     dispatch({

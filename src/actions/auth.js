@@ -12,12 +12,13 @@ import { setCurrentContent } from './current-content';
 import { listenToUsers } from './users-firebase';
 import { receiveCustomers } from './customer';
 
-export const openAuth = ( credentials = '') => {
+export const openAuth = (credentials = '') => {
 	return (dispatch) => {
 		try {
 			dispatch({ type: 'AUTH_OPEN' });
+			const { email, password } = credentials;
 			if (credentials) {
-				auth.signInWithEmailAndPassword(credentials.email, credentials.password)
+				auth.signInWithEmailAndPassword(email, password)
 				.catch(function(error) {
 		    		dispatch({
 							type: 'AUTH_ERROR',
@@ -51,17 +52,18 @@ export const listenToAuth = () => {
 				dispatch(setCurrentContent('goods'));
 				dispatch(listenToOptions());
 				if (authData && !authData.isAnonymous) {
-					dispatch(setModal({ content: ''}));
+					const { uid, displayName, email } = authData;
+					dispatch(setModal());
 					dispatch({
 						type: 'AUTH_LOGIN',
-						uid: authData.uid,
-						username: authData.displayName,
-						email: authData.email
+						uid,
+						displayName,
+						email
 					});
 					//here listen to some data from firebase
 					dispatch(listenToGoodsGroups());
 					dispatch(listenToGoods());
-					dispatch(listenToPrices());
+					// dispatch(listenToPrices());
 	    		if (authData.email) {
 	    			//get customer guid
 	    			const userUID = authData.uid;
@@ -77,6 +79,7 @@ export const listenToAuth = () => {
 		  						dispatch(setCustomer(guid, description, address, phone, email, inn));
 		  						dispatch(listenToOrdersHeaders());
 		  						dispatch(listenToOrdersItems());
+                  dispatch(listenToPrices());
 		  					});
 		  					let customerOptionsRef = database.ref(`options/${customerGuid}`);
 		  					customerOptionsRef.once('value', snapshot => {
@@ -86,12 +89,12 @@ export const listenToAuth = () => {
 		  						});
 		  					});
 	  					}
-	  					
+
 	  					//admin
 	  					if (userData.admin) {
 	  						const customersRef = database.ref('customers');
 	  						customersRef.on('value', snapshot => {
-	  							dispatch(receiveCustomers(snapshot.val()));	
+	  							dispatch(receiveCustomers(snapshot.val()));
 	  						});
 	  					}
 	  				});
@@ -173,17 +176,17 @@ export const createUser = (email, password, admin = false) => {
 				  } else {
 				    alert(errorMessage);
 				  }
-				  console.log(error);
+				  console.log('user creation error', error);
 				});
 			}
 		} catch (e) {}
 	};
 };
 
-export const checkForUsersExist = () => {
+export const checkAppHasUsers = () => {
 	return dispatch => {
 		return authCreateUsers.signInAnonymously().then(
-			(user) => {
+			user => {
 				const allUsersRef = databaseCreateUsers.ref('users');
 				allUsersRef.once('value').then(snapshot => {
 					if (snapshot.val() !== null) {
